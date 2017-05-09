@@ -1,0 +1,66 @@
+"""
+Search Summon API with Python.
+Based on Dough Chesnut's code at https://gist.github.com/1070641
+
+
+Replace the lines that say "yours" below and then rename to summon.py
+
+"""
+import httplib2
+import urllib
+from datetime import datetime
+import hmac
+import base64
+import hashlib
+import json
+from pprint import pprint
+
+api_id = '<yours goes here>'
+api_key = '<yours goes here>'
+publicsummonurl = 'http://<yours>.summon.serialssolutions.com/search?%s'
+
+summonHost = 'api.summon.serialssolutions.com'
+summonPath = '/2.0.0/search'
+def summonMkHeaders(querystring):
+            summonAccessID = api_id
+            summonSecretKey = api_key
+            summonAccept = "application/json"
+            summonThedate = datetime.utcnow().strftime("%a, %d %b %Y %H:%M:%S GMT")
+            summonQS = "&".join(sorted(querystring.split('&')))
+            summonQS = urllib.unquote_plus(summonQS)
+            summonIdString = summonAccept + "\n" + summonThedate + "\n" + summonHost + "\n" + summonPath + "\n" + summonQS + "\n"
+            summonDigest = base64.encodestring(hmac.new(summonSecretKey, unicode(summonIdString), hashlib.sha1).digest())
+            summonAuthstring = "Summon "+summonAccessID+';'+summonDigest
+            summonAuthstring = summonAuthstring.replace('\n','')
+            return {'Accept':summonAccept,'x-summon-date':summonThedate,'Host':summonHost,'Authorization':summonAuthstring}
+
+http = httplib2.Http()
+
+def search(qdict):
+    qdict['s.role'] = 'authenticated'
+    qstring = urllib.urlencode(qdict)
+    url = 'http://%s%s?%s' % (summonHost, summonPath, qstring)
+    #print url
+    headers = summonMkHeaders(qstring)
+    # print headers
+    response, content = http.request(url, 'GET', headers=headers)
+    # print content
+    return json.loads(content)
+
+def publicsearch(qdict):
+    qstring = urllib.urlencode(qdict)
+    return publicsummonurl % qstring
+
+httpnoredirect = httplib2.Http()
+httpnoredirect.follow_redirects = False
+
+def getreallink(url):
+    response, content = httpnoredirect.request(url, 'GET')
+    if response['status'] == '307':
+        return response['location']
+    else:
+        return url
+
+if __name__ == '__main__':
+    content = search({ 's.q' : 'isbn: 9780735626171'})
+    pprint(content)
